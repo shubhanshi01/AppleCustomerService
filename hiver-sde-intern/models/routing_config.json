@@ -1,0 +1,17 @@
+{
+  "embedding_model": "all-MiniLM-L6-v2",
+  "classifier": "LogisticRegression",
+  "training_samples": 120,
+  "num_intents": 10,
+  "confidence_threshold": 0.2,
+  "decision_policy": {
+    "high_confidence": "Use predicted intent for retrieval",
+    "low_confidence": "Ask clarification or escalate to human"
+  },
+  "evaluation": {
+    "accuracy": 0.5,
+    "macro_f1": 0.3411,
+    "weighted_f1": 0.5002,
+    "evaluation_method": "4-fold stratified cross-validation"
+  }
+}

@@ -1,0 +1,17 @@
+# Decision log
+
+1. Chose AppleSupport because the raw export contains many direct public replies and enough distinct issue types for a narrow operational taxonomy.
+2. Used immediate customer -> AppleSupport reply pairs as retrieval evidence; this avoids joining unrelated branches below popular announcements.
+3. Kept `in_response_to_tweet_id` as the parent signal, not `response_tweet_id`, because the latter can contain multiple IDs.
+4. Used eight intents rather than mirroring a generic banking taxonomy; they correspond to recurring Apple-support actions.
+5. Kept an `other` class because forced specificity is unsafe for short Twitter messages.
+6. Started with a keyword classifier so the initial router is inspectable and easy to challenge in an interview.
+7. Included a TF-IDF classifier as a simple learned baseline, but do not train/report it until the reviewed split exists.
+8. Used lexical TF-IDF retrieval to keep the default stack fast, local, and reproducible without model downloads.
+9. Retrieve historical replies as evidence, but never paste them into a generated reply; public data can include stale links and case-specific language.
+10. Use conservative templates so the agent cannot promise refunds, expose data, or hallucinate account state.
+11. Escalate account, payment, privacy, fraud, legal, and low-confidence messages even when retrieval looks strong.
+12. Treat retrieval similarity as a coverage signal, not proof that the historical resolution is correct.
+13. Stratify the golden worksheet by weak labels to ensure sparse intents are reviewed; weak labels are never treated as ground truth.
+14. Refuse to print a headline score until a reviewer has set `reviewed=True` on golden examples.
+15. Require judge-vs-human agreement before trusting the LLM judge as the reply-quality metric.

@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+data/raw/twcs.csv
+data/raw/sample.csv
+data/processed/apple_reply_pairs.csv
+data/processed/apple_customer_tweets_cleaned.csv
+data/artifacts/
+data/evaluation/apple_predictions.csv
