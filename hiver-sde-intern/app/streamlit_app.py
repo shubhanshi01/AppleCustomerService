@@ -16,6 +16,7 @@ st.caption("Offline prototype using retrieved historical public support replies.
 @st.cache_resource
 def load_agent():
     pairs = pd.read_csv(PROCESSED / "apple_reply_pairs.csv")
+    pairs = pairs.dropna(subset=["customer_text", "support_reply"])
     return SupportAgent(ReplyRetriever(pairs))
 
 if not (PROCESSED / "apple_reply_pairs.csv").exists():
@@ -30,6 +31,7 @@ if st.button("Draft reply", type="primary", disabled=not message.strip()):
     b.metric("Confidence", f"{result['confidence']:.0%}")
     c.metric("Route", "Escalate" if result["escalate"] else "Auto-handle")
     st.subheader("Draft")
+    st.caption(f"Response source: {result['response_source']}")
     st.write(result["draft_reply"])
     st.info(result["escalation_reason"])
     st.subheader("Historical evidence")

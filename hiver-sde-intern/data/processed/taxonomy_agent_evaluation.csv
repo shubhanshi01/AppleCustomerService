@@ -1,0 +1,6 @@
+test_id,customer_message,predicted_intent,intent_confidence,retrieval_similarity,decision,final_response
+1,My battery is draining very quickly after updating to iOS 11.,battery_power,0.404,0.882,use_retrieved_evidence,"Thanks for reaching out. That's unexpected, but we'd be happy to help. Let us know which iOS version you currently have installed. You can check in Settings > General > About."
+2,My keyboard keeps changing the word I to something else.,keyboard_input,0.514,0.825,use_retrieved_evidence,"Could you tell us which iPhone model and iOS version you're using, and which keyboard or typing issue you're seeing?"
+3,I cannot log in to my Apple ID.,apple_id_icloud,0.195,0.77,clarify_or_escalate,"Could you tell us what happens when you try to sign in to your Apple ID, including any error message you see?"
+4,My iPhone keeps freezing after the latest update.,performance_freezing,0.249,0.86,use_retrieved_evidence,"Could you tell us which iPhone model and iOS version you're using, and when the freezing started?"
+5,I have a problem with my phone.,device_hardware,0.153,0.796,clarify_or_escalate,Could you tell us which device you're using and describe what hardware problem you're experiencing?

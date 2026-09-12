@@ -1,339 +1,167 @@
-# Failure Analysis
+Failure Analysis
+Hiver SDE Intern — AppleSupport AI Support Agent
 
-## Hiver SDE Intern — AppleSupport AI Support Agent
+Status: Working document
+Dataset: Customer Support on Twitter (thoughtvector/customer-support-on-twitter)
+Brand: AppleSupport
+Development sample: 100,000 tweets
 
-> **Status:** Working document
-> **Dataset:** Customer Support on Twitter (`thoughtvector/customer-support-on-twitter`)
-> **Brand:** AppleSupport
-> **Development sample:** 100,000 tweets
-
----
-
-## 1. Root-component ≠ conversation
-
-### What failed
+1. Root-component ≠ conversation
+What failed
 
 The first conversation reconstruction approach grouped tweets using the root of their parent chain and treated each root-connected component as a single conversation.
 
 This produced components that could contain multiple unrelated customer issues.
 
-### Evidence
+Evidence
 
 In the development sample:
 
-* 2,066 AppleSupport root components were identified.
-* Some components contained many independent customer branches.
-* Component `9200` contained **37 tweets** and **11 direct customer branches**.
+2,066 AppleSupport root components were identified.
+Some components contained many independent customer branches.
+Component 9200 contained 37 tweets and 11 direct customer branches.
 
 The root tweet was an AppleSupport announcement:
 
-> "It’s attack of the new emoji."
+"It’s attack of the new emoji."
 
 Different customers then replied to that announcement with unrelated issues, including:
 
-* battery drain,
-* App Store/payment problems,
-* activation errors,
-* iPhone X questions,
-* keyboard issues,
-* Messages/emoji problems.
+battery drain,
+App Store/payment problems,
+activation errors,
+iPhone X questions,
+keyboard issues,
+Messages/emoji problems.
 
 These are not one support conversation.
 
-### Impact
+Impact
 
 If the entire root component were treated as one training/retrieval example:
 
-* unrelated issues could become retrieval context;
-* intent labels could become ambiguous;
-* generated replies could use evidence belonging to another customer;
-* evaluation could overestimate or underestimate performance depending on the branch.
+unrelated issues could become retrieval context;
+intent labels could become ambiguous;
+generated replies could use evidence belonging to another customer;
+evaluation could overestimate or underestimate performance depending on the branch.
+Fix
 
-### Fix
+Preserve the original conversation_id as a connected-component/root identifier but introduce a separate branch-aware thread_id.
 
-Preserve the original `conversation_id` as a connected-component/root identifier but introduce a separate **branch-aware `thread_id`**.
+A thread follows actual parent_tweet_id relationships from a local root to a leaf.
 
-A thread follows actual `parent_tweet_id` relationships from a local root to a leaf.
-
-### Lesson
+Lesson
 
 A graph-connected component is not necessarily a semantic conversation.
 
-For support-agent retrieval, **parent-child thread structure is more useful than root-component grouping**.
+For support-agent retrieval, parent-child thread structure is more useful than root-component grouping.
 
----
+2. response_tweet_id is not a safe single-parent conversation signal
+What failed
 
-## 2. `response_tweet_id` is not a safe single-parent conversation signal
-
-### What failed
-
-The raw dataset contains tweets where `response_tweet_id` contains multiple tweet IDs.
+The raw dataset contains tweets where response_tweet_id contains multiple tweet IDs.
 
 Example:
 
-```text
 705 → response_tweet_id = 706,704
-```
 
 The initial assumption that this represented one direct response would be incorrect.
 
-### Evidence
+Evidence
 
 In the 100k development sample:
 
-* 9,661 tweets contained multiple response IDs.
-* One tweet had **1,090 response IDs**.
+9,661 tweets contained multiple response IDs.
+One tweet had 1,090 response IDs.
+Impact
 
-### Impact
+Using response_tweet_id as a simple linear conversation sequence would introduce incorrect relationships.
 
-Using `response_tweet_id` as a simple linear conversation sequence would introduce incorrect relationships.
-
-### Fix
+Fix
 
 Use:
 
-```text
 in_response_to_tweet_id
-```
 
 as the authoritative parent relationship for tweets that are present in the working sample.
 
-Retain `response_tweet_id` as raw metadata because it contains useful information about outgoing relationships and may reference tweets outside the sampled dataset.
+Retain response_tweet_id as raw metadata because it contains useful information about outgoing relationships and may reference tweets outside the sampled dataset.
 
-### Lesson
+Lesson
 
 The Twitter dataset represents a graph, not a simple message → response table.
 
----
+3. Parent references can point outside the selected subset
+What failed
 
-## 3. Parent references can point outside the selected subset
-
-### What failed
-
-During thread construction, 26 tweets initially received no `thread_id`.
+During thread construction, 26 tweets initially received no thread_id.
 
 The first root-detection rule assumed that a root must have an empty parent.
 
 That assumption was incorrect.
 
-### Evidence
+Evidence
 
 Example:
 
-```text
 11651 support
    ↓
 11650 customer
    ↓
 11649 support
-```
 
-But tweet `11651` has a parent `11653` that is outside the selected AppleSupport subset.
+But tweet 11651 has a parent 11653 that is outside the selected AppleSupport subset.
 
-Therefore, `11651` is a **local root of the selected subset**, even though it is not a global root in the raw dataset.
+Therefore, 11651 is a local root of the selected subset, even though it is not a global root in the raw dataset.
 
-### Impact
+Impact
 
 A strict global-root definition causes valid partial threads to be excluded.
 
-### Fix
+Fix
 
 Define a local thread root as:
 
-> A tweet whose parent is not present inside the current working component.
+A tweet whose parent is not present inside the current working component.
 
 This allows partial but valid conversation branches to be reconstructed.
 
-### Lesson
+Lesson
 
-Sampling creates graph boundaries. Thread reconstruction must distinguish **global roots** from **local roots within the sampled dataset**.
+Sampling creates graph boundaries. Thread reconstruction must distinguish global roots from local roots within the sampled dataset.
 
----
-
-## 4. Notebook 01 cleaning coverage does not equal conversation coverage
-
-### Observation
+4. Notebook 01 cleaning coverage does not equal conversation coverage
+Observation
 
 Notebook 01 initially selected customer tweets using:
 
-```python
 (df_sample["inbound"] == True) &
 (df_sample["text"].str.contains("AppleSupport", case=False, na=False))
-```
 
 This produced:
 
-**3,020 customer tweets.**
+3,020 customer tweets.
 
 Notebook 02 reconstructed:
 
-**3,729 customer tweets** across AppleSupport-related conversation components.
+3,729 customer tweets across AppleSupport-related conversation components.
 
 Therefore:
 
-* 2,998 customer tweets had validated Notebook 01 cleaning fields.
-* 731 customer tweets were present in reconstructed conversations but did not directly mention `AppleSupport`.
+2,998 customer tweets had validated Notebook 01 cleaning fields.
+731 customer tweets were present in reconstructed conversations but did not directly mention AppleSupport.
 
 Coverage:
 
-**80.4%**
+80.4%
 
-### Interpretation
+Interpretation
 
 The 731 tweets are not necessarily bad data.
 
 Many are follow-up messages such as:
 
-> "Noticed a bug on my iPhone X/iOS 11.1.2..."
+"Noticed a bug on my iPhone X/iOS 11.1.2..."
 
 A customer may mention AppleSupport in the first message and omit it in later turns.
 
-### Decision
-
-Do not treat the 731 messages as corrupted or delete them.
-
-Notebook 01 remains the source of the validated cleaning pipeline.
-
-Notebook 02 preserves broader conversation context while explicitly tracking which messages have Notebook 01 cleaning metadata.
-
-### Lesson
-
-A message-level filter based on brand mentions can miss valid follow-up turns in multi-turn support conversations.
-
----
-
-## 5. Short or URL-heavy tweets cannot be discarded blindly
-
-### Observation
-
-Some tweets become empty after conservative cleaning.
-
-In the reconstructed 6,836 AppleSupport tweets:
-
-* 36 cleaned texts became empty.
-* 6,820 texts changed during cleaning.
-
-An example contained essentially a URL after removing mentions and links.
-
-### Risk
-
-A naive preprocessing pipeline might delete every short or empty-looking message.
-
-That can remove useful conversational context, especially when:
-
-* a customer is responding to a previous support question;
-* the message is an acknowledgement;
-* the message is an image/screenshot reference;
-* the parent message provides the missing context.
-
-### Decision
-
-Keep the original tweet and preserve quality flags.
-
-Cleaning is not equivalent to deletion.
-
----
-
-## 6. Multilingual and short-message language detection can be unreliable
-
-### Observation
-
-The dataset contains multilingual customer messages.
-
-Short technical messages can also be incorrectly classified by automatic language detection.
-
-### Risk
-
-Hard-filtering the dataset using language detection could remove legitimate support examples.
-
-### Decision
-
-Language detection is used as a **metadata/quality signal**, not as an absolute exclusion rule.
-
-The raw message remains preserved.
-
----
-
-## 7. DM deflection creates a misleading support-success signal
-
-### Observation
-
-In an earlier AppleSupport exploratory analysis, a large proportion of support responses were routing/DM messages rather than concrete troubleshooting responses.
-
-This means a model can appear strong at reproducing historical AppleSupport behavior simply by learning patterns such as:
-
-```text
-"Send us a DM and we'll help."
-```
-
-### Risk
-
-A high response similarity score could therefore reflect historical **DM deflection behavior**, rather than actual problem resolution.
-
-### Impact on evaluation
-
-A model that generates polite DM-routing responses may score well against historical replies while providing little actionable help.
-
-### Planned mitigation
-
-Evaluate response quality separately on:
-
-* groundedness,
-* actionability,
-* helpfulness,
-* policy safety,
-* escalation appropriateness.
-
-Do not use lexical similarity alone as the primary success metric.
-
----
-
-## 8. Offline single-turn evaluation may overestimate real support quality
-
-The current dataset reconstruction shows that support interactions can be multi-turn and branch-dependent.
-
-A model evaluated only on the first customer message may look strong while failing when:
-
-* the customer provides additional information;
-* support asks a clarification question;
-* the issue persists;
-* the conversation moves into DM;
-* multiple intents appear over several turns.
-
-### Planned mitigation
-
-The evaluation harness should include both:
-
-1. message-level intent evaluation;
-2. thread-level response/evidence evaluation.
-
----
-
-## 9. Current failures are data/structure failures, not model failures
-
-At this stage, we have intentionally not treated poor downstream performance as a model problem.
-
-The main discovered risks are upstream:
-
-* incorrect conversation grouping;
-* graph branching;
-* sampled graph boundaries;
-* incomplete cleaning coverage;
-* multilingual messages;
-* DM-routing bias.
-
-These need to be resolved before drawing conclusions about the classifier or RAG system.
-
----
-
-## Top failure modes to track for the final report
-
-The final Hiver report should prioritize the five failure modes with measurable examples:
-
-1. **Root component mistaken for a conversation**
-2. **DM deflection / historical-response bias**
-3. **Ambiguous or multi-intent customer messages**
-4. **Insufficient conversational context**
-5. **Language / noisy-message handling**
-
-These will be updated with quantitative evaluation evidence after the intent, retrieval, generation, and evaluation stages.

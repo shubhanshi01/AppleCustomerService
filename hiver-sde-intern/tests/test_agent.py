@@ -8,4 +8,5 @@ def test_agent_returns_auditable_contract():
     assert result["intent"] == "software_and_update"
     assert isinstance(result["escalate"], bool)
     assert result["draft_reply"]
+    assert result["response_source"] == "template"
     assert len(result["evidence"]) == 2

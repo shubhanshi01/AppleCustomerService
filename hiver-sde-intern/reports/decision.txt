@@ -1,17 +1,128 @@
-# Decision log
+Decision
 
-1. Chose AppleSupport because the raw export contains many direct public replies and enough distinct issue types for a narrow operational taxonomy.
-2. Used immediate customer -> AppleSupport reply pairs as retrieval evidence; this avoids joining unrelated branches below popular announcements.
-3. Kept `in_response_to_tweet_id` as the parent signal, not `response_tweet_id`, because the latter can contain multiple IDs.
-4. Used eight intents rather than mirroring a generic banking taxonomy; they correspond to recurring Apple-support actions.
-5. Kept an `other` class because forced specificity is unsafe for short Twitter messages.
-6. Started with a keyword classifier so the initial router is inspectable and easy to challenge in an interview.
-7. Included a TF-IDF classifier as a simple learned baseline, but do not train/report it until the reviewed split exists.
-8. Used lexical TF-IDF retrieval to keep the default stack fast, local, and reproducible without model downloads.
-9. Retrieve historical replies as evidence, but never paste them into a generated reply; public data can include stale links and case-specific language.
-10. Use conservative templates so the agent cannot promise refunds, expose data, or hallucinate account state.
-11. Escalate account, payment, privacy, fraud, legal, and low-confidence messages even when retrieval looks strong.
-12. Treat retrieval similarity as a coverage signal, not proof that the historical resolution is correct.
-13. Stratify the golden worksheet by weak labels to ensure sparse intents are reviewed; weak labels are never treated as ground truth.
-14. Refuse to print a headline score until a reviewer has set `reviewed=True` on golden examples.
-15. Require judge-vs-human agreement before trusting the LLM judge as the reply-quality metric.
+1.Do not treat the 731 messages as corrupted or delete them.
+
+2.Notebook 01 remains the source of the validated cleaning pipeline.
+
+3.Notebook 02 preserves broader conversation context while explicitly tracking which messages have Notebook 01 cleaning metadata.
+
+Lesson
+
+A message-level filter based on brand mentions can miss valid follow-up turns in multi-turn support conversations.
+
+5. Short or URL-heavy tweets cannot be discarded blindly
+Observation
+
+Some tweets become empty after conservative cleaning.
+
+In the reconstructed 6,836 AppleSupport tweets:
+
+36 cleaned texts became empty.
+6,820 texts changed during cleaning.
+
+An example contained essentially a URL after removing mentions and links.
+
+Risk
+
+A naive preprocessing pipeline might delete every short or empty-looking message.
+
+That can remove useful conversational context, especially when:
+
+a customer is responding to a previous support question;
+the message is an acknowledgement;
+the message is an image/screenshot reference;
+the parent message provides the missing context.
+Decision
+
+Keep the original tweet and preserve quality flags.
+
+Cleaning is not equivalent to deletion.
+
+6. Multilingual and short-message language detection can be unreliable
+Observation
+
+The dataset contains multilingual customer messages.
+
+Short technical messages can also be incorrectly classified by automatic language detection.
+
+Risk
+
+Hard-filtering the dataset using language detection could remove legitimate support examples.
+
+Decision
+
+Language detection is used as a metadata/quality signal, not as an absolute exclusion rule.
+
+The raw message remains preserved.
+
+7. DM deflection creates a misleading support-success signal
+Observation
+
+In an earlier AppleSupport exploratory analysis, a large proportion of support responses were routing/DM messages rather than concrete troubleshooting responses.
+
+This means a model can appear strong at reproducing historical AppleSupport behavior simply by learning patterns such as:
+
+"Send us a DM and we'll help."
+Risk
+
+A high response similarity score could therefore reflect historical DM deflection behavior, rather than actual problem resolution.
+
+Impact on evaluation
+
+A model that generates polite DM-routing responses may score well against historical replies while providing little actionable help.
+
+Planned mitigation
+
+Evaluate response quality separately on:
+
+groundedness,
+actionability,
+helpfulness,
+policy safety,
+escalation appropriateness.
+
+Do not use lexical similarity alone as the primary success metric.
+
+8. Offline single-turn evaluation may overestimate real support quality
+
+The current dataset reconstruction shows that support interactions can be multi-turn and branch-dependent.
+
+A model evaluated only on the first customer message may look strong while failing when:
+
+the customer provides additional information;
+support asks a clarification question;
+the issue persists;
+the conversation moves into DM;
+multiple intents appear over several turns.
+Planned mitigation
+
+The evaluation harness should include both:
+
+message-level intent evaluation;
+thread-level response/evidence evaluation.
+9. Current failures are data/structure failures, not model failures
+
+At this stage, we have intentionally not treated poor downstream performance as a model problem.
+
+The main discovered risks are upstream:
+
+incorrect conversation grouping;
+graph branching;
+sampled graph boundaries;
+incomplete cleaning coverage;
+multilingual messages;
+DM-routing bias.
+
+These need to be resolved before drawing conclusions about the classifier or RAG system.
+
+Top failure modes to track for the final report
+
+The final Hiver report should prioritize the five failure modes with measurable examples:
+
+Root component mistaken for a conversation
+DM deflection / historical-response bias
+Ambiguous or multi-intent customer messages
+Insufficient conversational context
+Language / noisy-message handling
+
+These will be updated with quantitative evaluation evidence after the intent, retrieval, generation, and evaluation stages.
