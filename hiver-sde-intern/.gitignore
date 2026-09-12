@@ -1,6 +1,16 @@
 .venv/
 __pycache__/
 .pytest_cache/
+.streamlit/secrets.toml
+.env
+*.py[cod]
+
+# Local source data and generated runtime outputs
+data/raw/twcs.csv
+data/processed/apple_reply_pairs.csv
+data/evaluation/apple_predictions.csv.venv/
+__pycache__/
+.pytest_cache/
 *.pyc
 data/raw/twcs.csv
 data/raw/sample.csv
